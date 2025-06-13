@@ -3,5 +3,12 @@ services:
     container_name: renamarr
     image: ghcr.io/hollanbm/renamarr:latest
     restart: unless-stopped
+    environment:
+      # Sonarr API Keys - set these in your .env file
+      - SONARR_TV_API_KEY=${SONARR_TV_API_KEY}
+      - SONARR_ANIME_API_KEY=${SONARR_ANIME_API_KEY}
+      # Radarr API Keys - set these in your .env file
+      - RADARR_API_KEY=${RADARR_API_KEY}
+      - RADARR_4K_API_KEY=${RADARR_4K_API_KEY}
     volumes:
       - ./config.yml:/config/config.yml:ro

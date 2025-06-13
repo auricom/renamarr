@@ -1,4 +1,6 @@
 import os
+import re
+import tempfile
 from contextlib import contextmanager
 from sys import stdout
 from time import sleep
@@ -101,7 +103,45 @@ class Main:
             # configparser uses cwd, for file opens.
             # Change to root directory, to look for config in /config/config.yml
             with set_directory("/"):
-                config = configparser.get_config(CONFIG_SCHEMA)
+                # Load raw YAML first to expand environment variables
+                config_path = "/config/config.yml"
+                if not os.path.exists(config_path):
+                    config_path = "/config/config.yaml"
+                
+                # Read and expand environment variables in YAML content
+                with open(config_path, 'r') as file:
+                    yaml_content = file.read()
+                
+                # Pattern to match ${VAR_NAME} or ${VAR_NAME:-default}
+                pattern = r'\$\{([^}]+)\}'
+                
+                def replace_var(match):
+                    var_expr = match.group(1)
+                    if ':-' in var_expr:
+                        var_name, default_value = var_expr.split(':-', 1)
+                        return os.getenv(var_name.strip(), default_value)
+                    else:
+                        var_name = var_expr.strip()
+                        env_value = os.getenv(var_name)
+                        if env_value is None:
+                            logger.warning(f"Environment variable '{var_name}' not found, keeping original value")
+                            return match.group(0)  # Return the original ${VAR_NAME} if not found
+                        return env_value
+                
+                expanded_yaml = re.sub(pattern, replace_var, yaml_content)
+                
+                # Write the expanded content to a temporary file for configparser
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.yml', delete=False) as temp_file:
+                    temp_file.write(expanded_yaml)
+                    temp_config_path = temp_file.name
+                
+                try:
+                    # Use configparser with the expanded config
+                    config = configparser.get_config(CONFIG_SCHEMA, config_dir=os.path.dirname(temp_config_path), file_name=os.path.basename(temp_config_path))
+                finally:
+                    # Clean up temporary file
+                    os.unlink(temp_config_path)
+                    
         except ConfigFileNotFoundError as exc:
             logger.error(
                 "Unable to locate config file, please check volume mount paths, config must be mounted at /config/config.yaml"
@@ -111,6 +151,12 @@ class Main:
         except ConfigError as exc:
             logger.error(
                 "Unable to parse config file, Please see example config for comparison -- https://github.com/hollanbm/renamarr/blob/main/docker/config.yml.example"
+            )
+            logger.error(exc)
+            exit(1)
+        except FileNotFoundError as exc:
+            logger.error(
+                "Unable to read or parse config file, please check if /config/config.yml exists and is valid YAML"
             )
             logger.error(exc)
             exit(1)

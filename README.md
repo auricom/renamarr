@@ -70,6 +70,60 @@ The application run immediately on startup, and then continue to schedule jobs e
 | `radarr[].renamarr.hourly_job`             | boolean | No       | False         | disables hourly job. App will exit after first execution                                                                                         |
 | `radarr[].renamarr.analyze_files`          | boolean | No       | False         | This will initiate a rescan of the files in your library. This is helpful if you are transcoding files, and the audio/video codecs have changed. |
 
+### Environment Variables
+
+Renamarr supports environment variable substitution in the configuration file. This is especially useful for sensitive data like API keys.
+
+#### Syntax
+
+You can use the following syntax in your `config.yml`:
+
+- `${VAR_NAME}` - Substitutes the environment variable `VAR_NAME`. If the variable doesn't exist, the original `${VAR_NAME}` text is kept.
+- `${VAR_NAME:-default_value}` - Substitutes the environment variable `VAR_NAME`, or uses `default_value` if the variable doesn't exist.
+
+#### Example
+
+```yaml
+sonarr:
+  - name: tv
+    url: https://sonarr.tld:8989
+    api_key: ${SONARR_API_KEY:-fallback-key}
+    renamarr:
+      enabled: true
+      hourly_job: true
+
+radarr:
+  - name: movies
+    url: https://radarr.tld:7878
+    api_key: ${RADARR_API_KEY}
+    renamarr:
+      enabled: true
+      hourly_job: true
+```
+
+#### Docker Compose Usage
+
+When using Docker Compose, you can set environment variables in your `.env` file:
+
+```env
+SONARR_API_KEY=your-actual-sonarr-api-key
+RADARR_API_KEY=your-actual-radarr-api-key
+```
+
+And reference them in your `docker-compose.yml`:
+
+```yaml
+services:
+  renamarr:
+    container_name: renamarr
+    image: ghcr.io/hollanbm/renamarr:latest
+    environment:
+      - SONARR_API_KEY=${SONARR_API_KEY}
+      - RADARR_API_KEY=${RADARR_API_KEY}
+    volumes:
+      - ./config.yml:/config/config.yml:ro
+```
+
 ### Local Setup
 
 #### Requirements
